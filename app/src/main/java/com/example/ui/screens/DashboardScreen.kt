@@ -1,8 +1,5 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,13 +19,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAlert
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,7 +52,6 @@ import com.example.data.model.GameState
 import com.example.data.model.User
 import com.example.ui.components.EmergencyBroadcastBanner
 import com.example.ui.components.SurvivorAvatar
-import com.example.ui.components.TerminalBadge
 import com.example.ui.components.TerminalButton
 import com.example.ui.components.TerminalCard
 import com.example.ui.theme.TerminalTheme
@@ -74,6 +66,7 @@ fun DashboardScreen(
     gameState: GameState,
     recentEvents: List<EventLog>,
     onReportCasualty: (String) -> Unit,
+    onReportKill: (String) -> Unit = {},
     onNavigateToShop: () -> Unit,
     showBroadcast: Boolean,
     onDismissBroadcast: () -> Unit,
@@ -81,20 +74,19 @@ fun DashboardScreen(
 ) {
     val theme = TerminalTheme.current
     var showSectorPickerSheet by remember { mutableStateOf(false) }
-    var selectedSectorToReport by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
         }
 
-        // Emergency Broadcast Banner if visible
+        // Emergency Broadcast
         if (showBroadcast && gameState.featuredVideoText.isNotEmpty()) {
             item {
                 EmergencyBroadcastBanner(
@@ -109,8 +101,8 @@ fun DashboardScreen(
             item {
                 TerminalCard(
                     modifier = Modifier.fillMaxWidth(),
-                    borderColor = theme.secondary.copy(alpha = 0.6f),
-                    backgroundColor = theme.secondary.copy(alpha = 0.12f),
+                    borderColor = theme.secondary.copy(alpha = 0.5f),
+                    backgroundColor = theme.secondary.copy(alpha = 0.1f),
                     onClick = onNavigateToShop
                 ) {
                     Row(
@@ -118,18 +110,18 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🔥", fontSize = 24.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Text(text = "🔥", fontSize = 22.sp)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "BLACK MARKET FLASH SALE: -${gameState.flashSaleDiscount}%",
-                                    style = MaterialTheme.typography.labelLarge,
+                                    text = "FLASH SALE: -${gameState.flashSaleDiscount}% OFF",
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = theme.secondary,
                                     fontWeight = FontWeight.Black
                                 )
                                 Text(
-                                    text = "All gear, titles, and themes discounted. Tap to browse market.",
+                                    text = "Black Market gear and themes discounted. Tap to view.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = theme.textLight
                                 )
@@ -139,98 +131,14 @@ fun DashboardScreen(
                             imageVector = Icons.Default.ShoppingCart,
                             contentDescription = "Shop",
                             tint = theme.secondary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
         }
 
-        // Top 2-Column Grid (Credits & Shield)
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Credits Card
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(1.dp, theme.surface3, RoundedCornerShape(24.dp)),
-                    color = theme.surface1
-                ) {
-                    Box(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "🪙",
-                            fontSize = 32.sp,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .clip(CircleShape),
-                            color = Color.White.copy(alpha = 0.15f)
-                        )
-                        Column {
-                            Text(
-                                text = "CREDITS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = theme.textGray,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                fontSize = 10.sp
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = String.format(Locale.US, "%,d", user.playerData.coins),
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = theme.secondary,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 24.sp
-                            )
-                        }
-                    }
-                }
-
-                // Shield Status Card
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(24.dp))
-                        .border(1.dp, theme.surface3, RoundedCornerShape(24.dp)),
-                    color = theme.surface1
-                ) {
-                    Box(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "🛡️",
-                            fontSize = 32.sp,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .clip(CircleShape),
-                            color = Color.White.copy(alpha = 0.15f)
-                        )
-                        Column {
-                            Text(
-                                text = "SHIELD",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = theme.textGray,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                fontSize = 10.sp
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = if (user.playerData.shield) "ACTIVE" else "OFFLINE",
-                                style = MaterialTheme.typography.headlineMedium,
-                                color = if (user.playerData.shield) theme.tertiary else theme.textGray,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 22.sp
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Survivor Profile Identity Card
+        // Clean Survivor Identity Card
         item {
             TerminalCard(
                 modifier = Modifier
@@ -260,44 +168,61 @@ fun DashboardScreen(
                                 fontWeight = FontWeight.Black
                             )
                             Text(
-                                text = "[ ${user.playerData.title} ]",
+                                text = user.playerData.title,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = theme.primary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.8.sp
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    // Personal Deaths Metric
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(theme.surface2)
-                            .border(1.dp, theme.surface3, RoundedCornerShape(14.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    // Coins & Shield badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                text = "MY CASUALTIES",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = theme.textGray,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "💀 ${user.playerData.totalDeaths}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = theme.primary,
-                                fontWeight = FontWeight.Black
-                            )
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = theme.surface2,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, theme.surface3)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "🪙", fontSize = 14.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "${user.playerData.coins}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = theme.secondary,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                        }
+
+                        if (user.playerData.shield) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = theme.tertiary.copy(alpha = 0.15f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, theme.tertiary.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "🛡️ SHIELD",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = theme.tertiary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Feature Stat Block: Global Casualties Card
+        // Global Casualties Counter Card
         item {
             TerminalCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -310,47 +235,42 @@ fun DashboardScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = theme.textGray,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp,
-                        fontSize = 11.sp
+                        letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         verticalAlignment = Alignment.Bottom,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = String.format(Locale.US, "%,d", gameState.grandTotal),
-                            style = MaterialTheme.typography.displayMedium,
+                            style = MaterialTheme.typography.displaySmall,
                             color = theme.primary,
                             fontWeight = FontWeight.Black,
-                            fontSize = 38.sp
+                            fontSize = 32.sp
                         )
-                        val todayCasualties = recentEvents.count { it.category == "death" }.coerceAtLeast(1)
                         Text(
-                            text = "+$todayCasualties today",
+                            text = "total deaths logged",
                             style = MaterialTheme.typography.bodySmall,
-                            color = theme.primary.copy(alpha = 0.65f),
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 6.dp)
+                            color = theme.textGray,
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Tactical Progress Gauge
-                    val progressFraction = (gameState.grandTotal % 1000).toFloat() / 1000f
+                    val progressFraction = ((gameState.grandTotal % 1000).toFloat() / 1000f).coerceIn(0.05f, 1f)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
                             .background(theme.bgDark)
-                            .border(1.dp, theme.surface3, RoundedCornerShape(4.dp))
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(fraction = progressFraction.coerceIn(0.08f, 1f))
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
+                                .fillMaxWidth(fraction = progressFraction)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
                                 .background(theme.primary)
                         )
                     }
@@ -358,84 +278,63 @@ fun DashboardScreen(
             }
         }
 
-        // Giant Glowing "REPORT CASUALTY" Button
+        // Prominent Report Casualty Button
         item {
             TerminalButton(
                 text = "REPORT CASUALTY",
                 onClick = { showSectorPickerSheet = true },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
-                    .shadow(16.dp, RoundedCornerShape(24.dp), spotColor = theme.primary),
-                icon = "☣",
+                    .height(52.dp),
+                icon = "☣️",
                 testTag = "btn_report_casualty"
             )
         }
 
-        // Recent Activity Feed Header
+        // Live Feed Header
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(theme.primary)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "RECENT ACTIVITY",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = theme.textGray,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(theme.primary.copy(alpha = 0.1f))
-                        .border(1.dp, theme.primary.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "LIVE FEED",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = theme.primary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp,
-                        letterSpacing = 0.8.sp
-                    )
-                }
+                Text(
+                    text = "RECENT ACTIVITY",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = theme.textGray,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = "${recentEvents.size} LOGS",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = theme.primary,
+                    fontSize = 10.sp
+                )
             }
         }
 
-        // Recent Activity Feed List (Last events)
+        // Event Stream
         if (recentEvents.isEmpty()) {
             item {
                 TerminalCard(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "NO RECENT CASUALTIES OR TRANSMISSIONS DETECTED.",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "NO CASUALTIES RECORDED YET. TAP 'REPORT CASUALTY' ABOVE.",
+                        style = MaterialTheme.typography.bodySmall,
                         color = theme.textGray,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp)
                     )
                 }
             }
         } else {
-            items(recentEvents.take(10), key = { it.id }) { event ->
+            items(recentEvents.take(15), key = { it.id }) { event ->
                 EventLogItemCard(event = event)
             }
         }
 
         item {
-            Spacer(modifier = Modifier.height(80.dp))
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 
@@ -446,7 +345,7 @@ fun DashboardScreen(
             sheetState = sheetState,
             containerColor = theme.surface1,
             contentColor = theme.textLight,
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -460,18 +359,22 @@ fun DashboardScreen(
                 ) {
                     Column {
                         Text(
-                            text = "SELECT CASUALTY SECTOR",
-                            style = MaterialTheme.typography.titleLarge,
+                            text = "REPORT CASUALTY",
+                            style = MaterialTheme.typography.titleMedium,
                             color = theme.primary,
                             fontWeight = FontWeight.Black
                         )
                         Text(
-                            text = "Log confirmed survivor termination in combat sector",
+                            text = "Select zone to record casualty (+5 Coins bounty)",
                             style = MaterialTheme.typography.bodySmall,
                             color = theme.textGray
                         )
                     }
-                    IconButton(onClick = { showSectorPickerSheet = false }) {
+
+                    IconButton(
+                        onClick = { showSectorPickerSheet = false },
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = theme.textGray)
                     }
                 }
@@ -480,30 +383,22 @@ fun DashboardScreen(
 
                 gameState.games.forEach { sector ->
                     val isLocked = gameState.lockedGames.contains(sector)
-                    val isSelected = selectedSectorToReport == sector
-
-                    val cardBorder = when {
-                        isLocked -> theme.surface3
-                        isSelected -> theme.primary
-                        else -> theme.primaryDim
-                    }
-                    val cardBg = when {
-                        isLocked -> theme.surface2.copy(alpha = 0.5f)
-                        isSelected -> theme.primaryDim
-                        else -> theme.surface2
-                    }
+                    val isShooter = gameState.sectorModes[sector]?.equals("SHOOTER", ignoreCase = true) == true
+                    val stats = user.playerData.games[sector]
+                    val userSectorDeaths = stats?.deaths ?: 0
+                    val userSectorKills = stats?.kills ?: 0
 
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 5.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, cardBorder, RoundedCornerShape(12.dp))
-                            .clickable(enabled = !isLocked) {
-                                selectedSectorToReport = sector
-                            }
-                            .testTag("sector_option_${sector.take(9)}"),
-                        color = cardBg
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        color = if (isLocked) theme.surface2.copy(alpha = 0.5f) else theme.surface2,
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isLocked) theme.surface3 else theme.surface3
+                        )
                     ) {
                         Row(
                             modifier = Modifier
@@ -512,150 +407,201 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(
-                                    text = if (isLocked) "🔒" else "📍",
-                                    fontSize = 18.sp
+                                    text = if (isLocked) "🔒" else if (isShooter) "🎯" else "📍",
+                                    fontSize = 16.sp
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = sector,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isLocked) theme.textGray else theme.textLight,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (isShooter) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = theme.error.copy(alpha = 0.2f),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, theme.error.copy(alpha = 0.4f))
+                                            ) {
+                                                Text(
+                                                    text = "SHOOTER",
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = theme.error,
+                                                    fontSize = 8.sp,
+                                                    fontWeight = FontWeight.Black
+                                                )
+                                            }
+                                        }
+                                    }
                                     Text(
-                                        text = sector,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = if (isLocked) theme.textGray else theme.textLight,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    val userDeathsInSector = user.playerData.games[sector]?.deaths ?: 0
-                                    Text(
-                                        text = if (isLocked) "QUARANTINED BY OVERSEER" else "Your Recorded Casualties: $userDeathsInSector",
+                                        text = if (isShooter) "Casualties: $userSectorDeaths  |  Kills: $userSectorKills" else "Casualties: $userSectorDeaths",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (isLocked) theme.error else theme.secondary
+                                        color = theme.textGray
                                     )
                                 }
                             }
 
-                            if (!isLocked && isSelected) {
-                                TerminalBadge(text = "SELECTED", color = theme.primary)
+                            if (isLocked) {
+                                Text(
+                                    text = "LOCKED",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = theme.error,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = theme.primary.copy(alpha = 0.15f),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, theme.primary.copy(alpha = 0.4f)),
+                                        modifier = Modifier.clickable {
+                                            onReportCasualty(sector)
+                                            showSectorPickerSheet = false
+                                        }.testTag("report_death_${sector.take(6)}")
+                                    ) {
+                                        Text(
+                                            text = "+1 💀",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = theme.primary,
+                                            fontWeight = FontWeight.Black
+                                        )
+                                    }
+
+                                    if (isShooter) {
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = theme.tertiary.copy(alpha = 0.15f),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, theme.tertiary.copy(alpha = 0.4f)),
+                                            modifier = Modifier.clickable {
+                                                onReportKill(sector)
+                                                showSectorPickerSheet = false
+                                            }.testTag("report_kill_${sector.take(6)}")
+                                        ) {
+                                            Text(
+                                                text = "+1 🎯",
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = theme.tertiary,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                TerminalButton(
-                    text = "TRANSMIT CASUALTY LOG (+1)",
-                    onClick = {
-                        val sector = selectedSectorToReport
-                        if (sector != null) {
-                            onReportCasualty(sector)
-                            showSectorPickerSheet = false
-                            selectedSectorToReport = null
-                        }
-                    },
-                    enabled = selectedSectorToReport != null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    icon = "⚡",
-                    testTag = "btn_confirm_casualty_report"
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
             }
         }
     }
 }
 
 @Composable
-fun EventLogItemCard(
-    event: EventLog,
-    modifier: Modifier = Modifier
-) {
+fun EventLogItemCard(event: EventLog) {
     val theme = TerminalTheme.current
 
-    val (categoryIcon, categoryColor, categoryLabel) = when (event.category) {
-        "death" -> Triple("💀", theme.error, "CASUALTY")
-        "curse_success" -> Triple("☣️", theme.secondary, "BIO-CURSE")
-        "curse_blocked" -> Triple("🛡️", theme.tertiary, "DEFLECTED")
-        "revive" -> Triple("💉", theme.success, "REVIVE")
-        "transfer" -> Triple("💸", theme.secondary, "TRANSFER")
-        "wheel" -> Triple("🎡", theme.primary, "FATE WHEEL")
-        else -> Triple("📡", theme.primary, "SYSTEM")
+    val icon = when (event.category) {
+        "death" -> "💀"
+        "curse_success" -> "☣️"
+        "curse_blocked" -> "🛡️"
+        "revive" -> "💉"
+        "transfer" -> "🪙"
+        "wheel" -> "🎡"
+        else -> "📡"
     }
 
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.US) }
+    val iconColor = when (event.category) {
+        "death" -> theme.primary
+        "curse_success" -> theme.error
+        "curse_blocked" -> theme.tertiary
+        "revive" -> theme.success
+        "transfer" -> theme.secondary
+        "wheel" -> theme.secondary
+        else -> theme.primary
+    }
+
     val formattedTime = remember(event.timestamp) {
-        if (event.timestamp > 0) timeFormat.format(Date(event.timestamp)) else "--:--"
+        try {
+            val diff = System.currentTimeMillis() - event.timestamp
+            when {
+                diff < 60_000 -> "just now"
+                diff < 3600_000 -> "${diff / 60_000}m ago"
+                diff < 86400_000 -> "${diff / 3600_000}h ago"
+                else -> SimpleDateFormat("MMM dd", Locale.US).format(Date(event.timestamp))
+            }
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     Surface(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, theme.surface3, RoundedCornerShape(16.dp)),
-        color = theme.surface2.copy(alpha = 0.6f)
+            .clip(RoundedCornerShape(12.dp)),
+        color = theme.surface1,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, theme.surface3)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "[$formattedTime]",
-                style = MaterialTheme.typography.labelSmall,
-                color = theme.primary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(categoryColor.copy(alpha = 0.12f))
-                    .border(1.dp, categoryColor.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(iconColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = categoryLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = categoryColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp,
-                    letterSpacing = 0.4.sp
-                )
+                Text(text = icon, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.width(10.dp))
 
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = event.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = theme.textLight,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (event.sector != null) {
+                    Text(
+                        text = "Sector: ${event.sector}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = theme.textGray,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
             Text(
-                text = event.message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = theme.textLight,
-                fontWeight = FontWeight.Normal,
-                fontSize = 12.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+                text = formattedTime,
+                style = MaterialTheme.typography.labelSmall,
+                color = theme.textGray,
+                fontSize = 10.sp
             )
         }
-    }
-}
-
-fun formatRelativeTime(timestamp: Long): String {
-    val diff = System.currentTimeMillis() - timestamp
-    val seconds = diff / 1000
-    val minutes = seconds / 60
-    val hours = minutes / 60
-    val days = hours / 24
-
-    return when {
-        seconds < 60 -> "JUST NOW"
-        minutes < 60 -> "${minutes}m AGO"
-        hours < 24 -> "${hours}h AGO"
-        else -> "${days}d AGO"
     }
 }

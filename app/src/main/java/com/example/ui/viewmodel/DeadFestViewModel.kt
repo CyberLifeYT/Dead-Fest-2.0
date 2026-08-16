@@ -23,25 +23,25 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class AppNavTab(val title: String, val icon: String, val badge: String? = null) {
-    DASHBOARD("DASHBOARD", "🏠"),
+enum class AppNavTab(val title: String, val icon: String) {
+    DASHBOARD("OVERVIEW", "🏠"),
     PLAYERS("SURVIVORS", "👥"),
-    SHOP("BLACK MARKET", "🛒"),
+    MARKET("MARKET", "🛒"),
     WHEEL("FATE WHEEL", "🎡"),
-    MORE("COMM HUB", "➕"),
-    SETTINGS("SYSTEM", "⚙️"),
-    ADMIN("OVERSEER", "🛡️")
+    COMMS("INTEL HUB", "📡"),
+    SETTINGS("SYSTEM", "⚙️")
 }
 
 enum class MoreSubScreen(val title: String) {
     HUB("COMMUNICATION HUB"),
-    MEDIA("MEDIA FEED"),
+    MEDIA("MEDIA TRANSMISSIONS"),
     VOTING("SECTOR VOTING"),
     TRANSFER("COIN TRANSFER"),
     MESSAGES("SECURE COMMS"),
     PATCH_NOTES("PATCH LOGS"),
-    ARCHIVES("TERMINAL ARCHIVES"),
-    DOWNLOADS("SYSTEM DOWNLINK")
+    ARCHIVES("SYSTEM ARCHIVES"),
+    DOWNLOADS("CLIENT DOWNLINK"),
+    ADMIN("OVERSEER CONSOLE")
 }
 
 data class ToastMessage(
@@ -57,9 +57,6 @@ class DeadFestViewModel(
     // Boot uplink state
     private val _isBooting = MutableStateFlow(true)
     val isBooting: StateFlow<Boolean> = _isBooting.asStateFlow()
-
-    private val _bootProgress = MutableStateFlow(0f)
-    val bootProgress: StateFlow<Boolean> = _isBooting.asStateFlow()
 
     // Navigation state
     private val _activeTab = MutableStateFlow(AppNavTab.DASHBOARD)
@@ -80,10 +77,6 @@ class DeadFestViewModel(
     private val _toastEvent = MutableSharedFlow<ToastMessage>()
     val toastEvent: SharedFlow<ToastMessage> = _toastEvent.asSharedFlow()
 
-    // Daily Bonus Modal Alert
-    private val _dailyBonusAwarded = MutableStateFlow(false)
-    val dailyBonusAwarded: StateFlow<Boolean> = _dailyBonusAwarded.asStateFlow()
-
     // Featured Emergency Broadcast Modal
     private val _showBroadcastModal = MutableStateFlow(false)
     val showBroadcastModal: StateFlow<Boolean> = _showBroadcastModal.asStateFlow()
@@ -93,11 +86,10 @@ class DeadFestViewModel(
     val showReportModal = MutableStateFlow(false)
     val showCurseTargetModal = MutableStateFlow(false)
     val showReviveSectorModal = MutableStateFlow(false)
-    val showDossierModal = MutableStateFlow<User?>(null)
     val pendingCurseItem = MutableStateFlow<ShopItem?>(null)
     val pendingReviveItem = MutableStateFlow<ShopItem?>(null)
 
-    // Wheel spin state
+    // Fate Wheel State
     val isWheelSpinning = MutableStateFlow(false)
     val wheelSpinRotation = MutableStateFlow(0f)
     val wheelSpinResult = MutableStateFlow<WheelSegment?>(null)
@@ -113,28 +105,41 @@ class DeadFestViewModel(
     val votePolls: StateFlow<List<VotePoll>> = repository.votePolls
     val chatMessages: StateFlow<List<ChatMessage>> = repository.chatMessages
     val isOnline: StateFlow<Boolean> = repository.isOnline
+    val performanceMode: StateFlow<Boolean> = repository.performanceMode
+
+    // Auth loading state
+    private val _isAuthLoading = MutableStateFlow(false)
+    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
 
     init {
-        // Boot sequence simulation
         viewModelScope.launch {
-            delay(1200)
+            delay(1000)
             _isBooting.value = false
             checkBroadcast()
         }
     }
 
+    fun initPreferences(context: android.content.Context) {
+        repository.initPreferences(context)
+    }
+
+    fun togglePerformanceMode(enabled: Boolean) {
+        repository.setPerformanceMode(enabled)
+        showToast(if (enabled) "⚡ PERFORMANCE MODE ENABLED (HIGH FPS)" else "STANDARD GRAPHICS ACTIVE")
+    }
+
     fun triggerRefresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            delay(600)
+            delay(500)
             _isRefreshing.value = false
-            showToast("TERMINAL SYNC COMPLETE // FEED UPDATED")
+            showToast("DATA SYNCED WITH CLOUD")
         }
     }
 
     fun selectTab(tab: AppNavTab) {
         _activeTab.value = tab
-        if (tab != AppNavTab.MORE) {
+        if (tab != AppNavTab.COMMS) {
             _activeMoreSubScreen.value = MoreSubScreen.HUB
             _activeChatRecipient.value = null
         }
@@ -149,10 +154,6 @@ class DeadFestViewModel(
         viewModelScope.launch {
             _toastEvent.emit(ToastMessage(msg, isError))
         }
-    }
-
-    fun dismissDailyBonus() {
-        _dailyBonusAwarded.value = false
     }
 
     fun dismissBroadcast() {
@@ -175,43 +176,66 @@ class DeadFestViewModel(
     // -------------------------------------------------------------
 
     fun login(email: String, pass: String) {
-        val result = repository.loginWithEmail(email, pass)
-        result.onSuccess {
-            showToast("ACCESS GRANTED: Welcome, Survivor ${it.displayName}")
-            checkBroadcast()
-        }.onFailure {
-            showToast(it.message ?: "Authentication failed", isError = true)
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            val result = repository.loginWithEmail(email, pass)
+            _isAuthLoading.value = false
+            result.onSuccess {
+                showToast("ACCESS GRANTED: Welcome, ${it.displayName}")
+                checkBroadcast()
+            }.onFailure {
+                showToast(it.message ?: "Authentication failed", isError = true)
+            }
         }
     }
 
-    fun register(email: String, pass: String) {
-        val result = repository.registerWithEmail(email, pass)
-        result.onSuccess {
-            showToast("TERMINAL INITIALIZED: Survivor Profile Created")
-            checkBroadcast()
-        }.onFailure {
-            showToast(it.message ?: "Registration failed", isError = true)
+    fun register(email: String, pass: String, callsign: String? = null) {
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            val result = repository.registerWithEmail(email, pass, callsign)
+            _isAuthLoading.value = false
+            result.onSuccess {
+                showToast("ACCOUNT CREATED: Welcome, ${it.displayName}")
+                checkBroadcast()
+            }.onFailure {
+                showToast(it.message ?: "Registration failed", isError = true)
+            }
+        }
+    }
+
+    fun sendPasswordReset(email: String) {
+        viewModelScope.launch {
+            val result = repository.sendPasswordReset(email)
+            result.onSuccess {
+                showToast("RESET LINK SENT: Transmitted to $email")
+            }.onFailure {
+                showToast(it.message ?: "Reset request failed", isError = true)
+            }
         }
     }
 
     fun googleSignIn() {
-        val result = repository.googleSignIn("Agent Delta")
-        result.onSuccess {
-            showToast("SATELLITE UPLINK CONNECTED: Welcome ${it.displayName}")
-            checkBroadcast()
-        }.onFailure {
-            showToast("Satellite uplink failed", isError = true)
+        viewModelScope.launch {
+            _isAuthLoading.value = true
+            val result = repository.googleSignIn("Agent Delta")
+            _isAuthLoading.value = false
+            result.onSuccess {
+                showToast("SATELLITE UPLINK: Welcome, ${it.displayName}")
+                checkBroadcast()
+            }.onFailure {
+                showToast("Satellite uplink failed", isError = true)
+            }
         }
     }
 
     fun logout() {
         repository.logout()
-        showToast("TERMINAL SESSION TERMINATED")
+        showToast("SIGNED OUT")
     }
 
     fun switchUser(user: User) {
         repository.switchUser(user)
-        showToast("SWAPPED ACTIVE TERMINAL // ${user.displayName}")
+        showToast("LOGGED IN AS ${user.displayName}")
     }
 
     // -------------------------------------------------------------
@@ -224,7 +248,7 @@ class DeadFestViewModel(
             showReportModal.value = false
             showToast("CASUALTY RECORDED: +1 in $sector (+5 Coins Bounty)")
         }.onFailure {
-            showToast(it.message ?: "Failed to log casualty", isError = true)
+            showToast(it.message ?: "Failed to report casualty", isError = true)
         }
     }
 
@@ -247,7 +271,7 @@ class DeadFestViewModel(
                 result.onSuccess {
                     showToast(it)
                 }.onFailure {
-                    showToast(it.message ?: "Transaction rejected", isError = true)
+                    showToast(it.message ?: "Transaction failed", isError = true)
                 }
             }
         }
@@ -307,7 +331,6 @@ class DeadFestViewModel(
         isWheelSpinning.value = true
         wheelSpinResult.value = null
 
-        // Calculate weighted random pick
         val totalWeight = items.sumOf { it.weight }
         val randomNum = (1..totalWeight).random()
         var accumulated = 0
@@ -324,7 +347,6 @@ class DeadFestViewModel(
         viewModelScope.launch {
             val segmentAngle = 360f / items.size
             val targetSegmentCenter = pickedIndex * segmentAngle + (segmentAngle / 2f)
-            // 5 full rotations + offset
             val totalSpinsDegrees = 360f * 5 + (360f - targetSegmentCenter)
             wheelSpinRotation.value = wheelSpinRotation.value + totalSpinsDegrees
 
@@ -332,7 +354,6 @@ class DeadFestViewModel(
             isWheelSpinning.value = false
             wheelSpinResult.value = chosenSegment
 
-            // 5-second cooldown
             wheelCooldownRemaining.value = 5
             while (wheelCooldownRemaining.value > 0) {
                 delay(1000)
@@ -349,7 +370,7 @@ class DeadFestViewModel(
     }
 
     // -------------------------------------------------------------
-    // Social / More Hub
+    // Social / Comms
     // -------------------------------------------------------------
 
     fun transferCoins(recipientUid: String, amount: Int) {
@@ -364,7 +385,7 @@ class DeadFestViewModel(
     fun castVote(pollId: String, option: String) {
         val result = repository.castVote(pollId, option)
         result.onSuccess {
-            showToast("VOTE SUBMITTED & LOGGED IN NEURAL MESH")
+            showToast("VOTE RECORDED")
         }.onFailure {
             showToast(it.message ?: "Vote failed", isError = true)
         }
@@ -373,9 +394,9 @@ class DeadFestViewModel(
     fun sendChatMessage(recipientUid: String, text: String) {
         val result = repository.sendChatMessage(recipientUid, text)
         result.onSuccess {
-            // instant scroll or update
+            // sent
         }.onFailure {
-            showToast(it.message ?: "Failed to transmit message", isError = true)
+            showToast(it.message ?: "Failed to send message", isError = true)
         }
     }
 
@@ -386,7 +407,7 @@ class DeadFestViewModel(
     fun updateProfile(displayName: String, avatar: String, colorHex: String, themeId: String) {
         val result = repository.updateProfile(displayName, avatar, colorHex, themeId)
         result.onSuccess {
-            showToast("SURVIVOR ID UPDATED // HARDWARE SYNCED")
+            showToast("PROFILE UPDATED")
         }.onFailure {
             showToast(it.message ?: "Update failed", isError = true)
         }
@@ -398,7 +419,7 @@ class DeadFestViewModel(
 
     fun toggleMarket(enabled: Boolean) {
         repository.toggleMarket(enabled)
-        showToast("MARKET STATUS: ${if (enabled) "ENABLED" else "DISABLED"}")
+        showToast("MARKET: ${if (enabled) "ENABLED" else "DISABLED"}")
     }
 
     fun toggleWheel(enabled: Boolean) {
@@ -408,42 +429,42 @@ class DeadFestViewModel(
 
     fun updateBroadcast(text: String, url: String, id: String) {
         repository.updateBroadcast(text, url, id)
-        showToast("SYSTEM BROADCAST TRANSMITTED ACROSS ALL UNITS")
+        showToast("BROADCAST PUBLISHED")
     }
 
     fun triggerFlashSale(discount: Int) {
         repository.triggerFlashSale(discount)
-        showToast("FLASH SALE ACTIVATED: $discount% DISCOUNT APPLIED")
+        showToast("FLASH SALE STARTED: $discount% OFF")
     }
 
     fun stopFlashSale() {
         repository.stopFlashSale()
-        showToast("FLASH SALE CONCLUDED")
+        showToast("FLASH SALE ENDED")
     }
 
     fun addSector(name: String) {
         repository.addSector(name)
-        showToast("SECTOR REGISTERED: $name")
+        showToast("SECTOR ADDED: $name")
     }
 
     fun toggleLockSector(name: String) {
         repository.toggleLockSector(name)
-        showToast("SECTOR QUARANTINE STATUS TOGGLED")
+        showToast("SECTOR LOCK TOGGLED")
     }
 
     fun deleteSector(name: String) {
         repository.deleteSector(name)
-        showToast("SECTOR DECOMMISSIONED")
+        showToast("SECTOR REMOVED")
     }
 
     fun addShopItem(item: ShopItem) {
         repository.addShopItem(item)
-        showToast("TACTICAL ITEM ADDED TO CATALOG")
+        showToast("ITEM ADDED")
     }
 
     fun deleteShopItem(id: String) {
         repository.deleteShopItem(id)
-        showToast("ITEM EXPUNGED FROM INVENTORY")
+        showToast("ITEM REMOVED")
     }
 
     fun addShopTitle(title: ShopTitle) {
@@ -468,22 +489,22 @@ class DeadFestViewModel(
 
     fun createPatchNote(title: String, content: String, author: String, version: String) {
         repository.createPatchNote(title, content, author, version)
-        showToast("PATCH LOG BROADCASTED")
+        showToast("PATCH NOTE PUBLISHED")
     }
 
     fun deletePatchNote(id: String) {
         repository.deletePatchNote(id)
-        showToast("PATCH LOG EXPUNGED")
+        showToast("PATCH NOTE DELETED")
     }
 
     fun createPoll(title: String, desc: String, options: List<String>) {
         repository.createPoll(title, desc, options)
-        showToast("COUNCIL POLL OPENED")
+        showToast("POLL CREATED")
     }
 
     fun toggleClosePoll(id: String) {
         repository.toggleClosePoll(id)
-        showToast("POLL STATUS TOGGLED")
+        showToast("POLL STATUS UPDATED")
     }
 
     fun deletePoll(id: String) {
@@ -491,28 +512,53 @@ class DeadFestViewModel(
         showToast("POLL DELETED")
     }
 
+    fun reportKill(sector: String) {
+        viewModelScope.launch {
+            val result = repository.reportKill(sector)
+            result.onSuccess {
+                showToast("CONFIRMED KILL RECORDED IN $sector")
+            }.onFailure {
+                showToast(it.message ?: "Kill reporting failed", true)
+            }
+        }
+    }
+
+    fun toggleLikeMedia(mediaId: String) {
+        repository.toggleLikeMedia(mediaId)
+    }
+
+    fun updateEconomyMultiplier(multiplier: Double) {
+        repository.updateEconomyMultiplier(multiplier)
+        showToast("ECONOMY MULTIPLIER UPDATED TO ${multiplier}x")
+    }
+
+    fun setSectorMode(sector: String, mode: String) {
+        repository.setSectorMode(sector, mode)
+        showToast("SECTOR MODE SET TO $mode")
+    }
+
     fun adjustPlayerCoins(uid: String, delta: Int) {
         repository.adjustPlayerCoins(uid, delta)
-        showToast("SURVIVOR BALANCE ADJUSTED BY $delta COINS")
+        showToast("ADJUSTED COINS BY $delta")
     }
 
     fun togglePlayerAdmin(uid: String) {
         repository.togglePlayerAdmin(uid)
-        showToast("OVERSEER PRIVILEGES TOGGLED")
+        showToast("ADMIN STATUS TOGGLED")
     }
 
     fun wipePlayerData(uid: String) {
         repository.wipePlayerData(uid)
-        showToast("SURVIVOR TELEMETRY PURGED")
+        showToast("PLAYER DATA CLEARED")
     }
 
     fun purgeMedia() {
         repository.purgeMedia()
-        showToast("DISCORD MEDIA FEED PURGED")
+        showToast("MEDIA FEED CLEARED")
     }
 
     fun resetEventData() {
         repository.resetEventData()
-        showToast("CENTRAL EVENT MATRIX & CASUALTIES RESET")
+        showToast("EVENTS RESET")
     }
 }

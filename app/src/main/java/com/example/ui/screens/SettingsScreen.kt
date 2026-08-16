@@ -58,9 +58,12 @@ val COLOR_OPTIONS = listOf(
 fun SettingsScreen(
     currentUser: User,
     allUsers: List<User>,
+    performanceMode: Boolean = false,
+    onTogglePerformanceMode: (Boolean) -> Unit = {},
     onUpdateProfile: (String, String, String, String) -> Unit,
     onSwitchUser: (User) -> Unit,
     onLogout: () -> Unit,
+    onOpenAdmin: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val theme = TerminalTheme.current
@@ -116,6 +119,53 @@ fun SettingsScreen(
                             text = "[ ${currentUser.playerData.title} ] // UID: ${currentUser.uid.take(8)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = theme.secondary
+                        )
+                    }
+                }
+            }
+        }
+
+        // Performance & Low-End Phone Optimization Matrix
+        item {
+            TerminalCard(
+                modifier = Modifier.fillMaxWidth(),
+                borderColor = if (performanceMode) theme.primary else theme.surface3
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "⚡ PERFORMANCE & LOW-END MODE",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = theme.primary,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (performanceMode) "HIGH FPS MODE: CRT scanlines and heavy shader overlays disabled for maximum responsiveness." else "STANDARD GRAPHICS: CRT mesh overlays enabled.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = theme.textGray
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        androidx.compose.material3.Switch(
+                            checked = performanceMode,
+                            onCheckedChange = onTogglePerformanceMode,
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedThumbColor = theme.bgDark,
+                                checkedTrackColor = theme.primary,
+                                uncheckedThumbColor = theme.textGray,
+                                uncheckedTrackColor = theme.surface2
+                            ),
+                            modifier = Modifier.testTag("switch_performance_mode")
                         )
                     }
                 }
@@ -379,6 +429,43 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Overseer Admin Panel Shortcut
+        if (currentUser.admin) {
+            item {
+                TerminalCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    borderColor = theme.primary,
+                    backgroundColor = theme.primary.copy(alpha = 0.1f),
+                    onClick = onOpenAdmin
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "🛡️", fontSize = 24.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "OVERSEER ROOT CONSOLE",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = theme.primary,
+                                    fontWeight = FontWeight.Black
+                                )
+                                Text(
+                                    text = "Manage global game matrix, sales, and economy.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = theme.textLight
+                                )
+                            }
+                        }
+                        TerminalBadge(text = "ADMIN ONLY", color = theme.primary)
                     }
                 }
             }

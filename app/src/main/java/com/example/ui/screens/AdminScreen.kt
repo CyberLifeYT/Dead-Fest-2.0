@@ -77,6 +77,8 @@ fun AdminScreen(
     onUpdateBroadcast: (String, String, String) -> Unit,
     onTriggerFlashSale: (Int) -> Unit,
     onStopFlashSale: () -> Unit,
+    onUpdateEconomyMultiplier: (Double) -> Unit = {},
+    onSetSectorMode: (String, String) -> Unit = { _, _ -> },
     onAddSector: (String) -> Unit,
     onToggleLockSector: (String) -> Unit,
     onDeleteSector: (String) -> Unit,
@@ -96,6 +98,7 @@ fun AdminScreen(
     onWipeUser: (String) -> Unit,
     onPurgeMedia: () -> Unit,
     onResetEventData: () -> Unit,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val theme = TerminalTheme.current
@@ -106,6 +109,7 @@ fun AdminScreen(
     var broadcastText by remember(gameState.featuredVideoText) { mutableStateOf(gameState.featuredVideoText) }
     var broadcastUrl by remember(gameState.featuredVideoUrl) { mutableStateOf(gameState.featuredVideoUrl) }
     var saleDiscount by remember { mutableFloatStateOf(30f) }
+    var economyMult by remember(gameState.economyMultiplier) { mutableFloatStateOf(gameState.economyMultiplier.toFloat()) }
 
     var newSectorName by remember { mutableStateOf("") }
 
@@ -135,13 +139,30 @@ fun AdminScreen(
                     Text(text = "🛡️", fontSize = 24.sp)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "OVERSEER ROOT CONTROL",
-                        style = MaterialTheme.typography.titleLarge,
+                        text = "OVERSEER CONTROL",
+                        style = MaterialTheme.typography.titleMedium,
                         color = theme.primary,
                         fontWeight = FontWeight.Black
                     )
                 }
-                TerminalBadge(text = "SUPERUSER", color = theme.primary)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TerminalBadge(text = "SUPERUSER", color = theme.primary)
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(theme.surface2)
+                            .clickable { onBack() }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "EXIT ✕",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = theme.textLight,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
             }
         }
 
@@ -328,6 +349,41 @@ fun AdminScreen(
                     }
                 }
             }
+
+            // Global Economy Multiplier Controls
+            item {
+                TerminalCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(text = "GLOBAL ECONOMY MULTIPLIER", style = MaterialTheme.typography.labelLarge, color = theme.primary, fontWeight = FontWeight.Black)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "CURRENT MULTIPLIER: ${String.format(java.util.Locale.US, "%.1f", economyMult)}x",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = theme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Slider(
+                            value = economyMult,
+                            onValueChange = { economyMult = it },
+                            valueRange = 0.5f..5.0f,
+                            steps = 8,
+                            colors = SliderDefaults.colors(thumbColor = theme.primary, activeTrackColor = theme.primary)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        TerminalButton(
+                            text = "APPLY MULTIPLIER (${String.format(java.util.Locale.US, "%.1f", economyMult)}x)",
+                            onClick = { onUpdateEconomyMultiplier(economyMult.toDouble()) },
+                            modifier = Modifier.fillMaxWidth(),
+                            icon = "⚡",
+                            testTag = "btn_apply_economy_mult"
+                        )
+                    }
+                }
+            }
         }
 
         // -------------------------------------------------------------
@@ -377,14 +433,37 @@ fun AdminScreen(
 
             items(gameState.games) { sector ->
                 val isLocked = gameState.lockedGames.contains(sector)
+                val currentMode = gameState.sectorModes[sector] ?: "NORMAL"
+                val isShooter = currentMode.equals("SHOOTER", ignoreCase = true)
                 TerminalCard(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
-                            Text(text = sector, style = MaterialTheme.typography.titleMedium, color = theme.textLight, fontWeight = FontWeight.Bold)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = sector, style = MaterialTheme.typography.titleMedium, color = theme.textLight, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isShooter) theme.error.copy(alpha = 0.2f) else theme.surface2,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isShooter) theme.error.copy(alpha = 0.5f) else theme.surface3),
+                                    modifier = Modifier.clickable {
+                                        val newMode = if (isShooter) "NORMAL" else "SHOOTER"
+                                        onSetSectorMode(sector, newMode)
+                                    }
+                                ) {
+                                    Text(
+                                        text = if (isShooter) "🎯 SHOOTER" else "📍 NORMAL",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isShooter) theme.error else theme.textLight,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                             Text(
                                 text = if (isLocked) "QUARANTINED" else "ACTIVE COMBAT ZONE",
                                 style = MaterialTheme.typography.labelSmall,

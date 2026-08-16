@@ -17,15 +17,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,9 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +65,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        viewModel.initPreferences(applicationContext)
         enableEdgeToEdge()
 
         setContent {
@@ -96,6 +92,8 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
     val patchNotes by viewModel.patchNotes.collectAsState()
     val votePolls by viewModel.votePolls.collectAsState()
     val chatMessages by viewModel.chatMessages.collectAsState()
+    val performanceMode by viewModel.performanceMode.collectAsState()
+    val isAuthLoading by viewModel.isAuthLoading.collectAsState()
 
     val activeTab by viewModel.activeTab.collectAsState()
     val activeMoreSubScreen by viewModel.activeMoreSubScreen.collectAsState()
@@ -136,8 +134,11 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
         } else if (currentUser == null) {
             AuthScreen(
                 onLogin = { email, pass -> viewModel.login(email, pass) },
-                onRegister = { email, pass -> viewModel.register(email, pass) },
-                onGoogleSignIn = { viewModel.googleSignIn() }
+                onRegister = { email, pass, callsign -> viewModel.register(email, pass, callsign) },
+                onGoogleSignIn = { viewModel.googleSignIn() },
+                onForgotPassword = { email -> viewModel.sendPasswordReset(email) },
+                isLoading = isAuthLoading,
+                performanceMode = performanceMode
             )
         } else {
             val user = currentUser!!
@@ -149,20 +150,18 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                         eyebrow = when (activeTab) {
                             AppNavTab.DASHBOARD -> "SECTOR TELEMETRY"
                             AppNavTab.PLAYERS -> "SURVIVOR ROSTER"
-                            AppNavTab.SHOP -> "BLACK MARKET PROTOCOL"
-                            AppNavTab.WHEEL -> "FATE PROBABILITY MATRIX"
-                            AppNavTab.MORE -> "SUB-NET ARCHIVES"
-                            AppNavTab.SETTINGS -> "HARDWARE CONFIG"
-                            AppNavTab.ADMIN -> "OVERSEER ROOT CONTROL"
+                            AppNavTab.MARKET -> "MARKET"
+                            AppNavTab.WHEEL -> "SURVIVAL PROBABILITY"
+                            AppNavTab.COMMS -> "INTEL & COMMS"
+                            AppNavTab.SETTINGS -> "SYSTEM CONFIG"
                         },
                         title = when (activeTab) {
                             AppNavTab.DASHBOARD -> "DEAD-FEST TERMINAL"
-                            AppNavTab.PLAYERS -> "ACTIVE SURVIVORS"
-                            AppNavTab.SHOP -> "TACTICAL BLACK MARKET"
+                            AppNavTab.PLAYERS -> "SURVIVORS"
+                            AppNavTab.MARKET -> "BLACK MARKET"
                             AppNavTab.WHEEL -> "WHEEL OF FATE"
-                            AppNavTab.MORE -> if (activeMoreSubScreen == MoreSubScreen.HUB) "COMMUNICATION HUB" else activeMoreSubScreen.title
-                            AppNavTab.SETTINGS -> "SURVIVOR SYSTEM"
-                            AppNavTab.ADMIN -> "OVERSEER CONSOLE"
+                            AppNavTab.COMMS -> if (activeMoreSubScreen == MoreSubScreen.HUB) "INTEL HUB" else activeMoreSubScreen.title
+                            AppNavTab.SETTINGS -> if (activeMoreSubScreen == MoreSubScreen.ADMIN) "OVERSEER CONSOLE" else "SETTINGS"
                         },
                         isRefreshing = isRefreshing,
                         onRefresh = { viewModel.triggerRefresh() }
@@ -181,7 +180,7 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    CrtScanlineOverlay(alpha = 0.04f)
+                    CrtScanlineOverlay(alpha = 0.03f, enabled = !performanceMode)
 
                     when (activeTab) {
                         AppNavTab.DASHBOARD -> {
@@ -190,7 +189,8 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                                 gameState = gameState,
                                 recentEvents = recentEvents,
                                 onReportCasualty = { viewModel.reportCasualty(it) },
-                                onNavigateToShop = { viewModel.selectTab(AppNavTab.SHOP) },
+                                onReportKill = { viewModel.reportKill(it) },
+                                onNavigateToShop = { viewModel.selectTab(AppNavTab.MARKET) },
                                 showBroadcast = showBroadcastModal,
                                 onDismissBroadcast = { viewModel.dismissBroadcast() }
                             )
@@ -201,17 +201,17 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                                 users = allUsers,
                                 currentUser = user,
                                 onOpenChat = { targetUser ->
-                                    viewModel.selectTab(AppNavTab.MORE)
+                                    viewModel.selectTab(AppNavTab.COMMS)
                                     viewModel.navigateMore(MoreSubScreen.MESSAGES, targetUser)
                                 },
                                 onOpenTransfer = { targetUser ->
-                                    viewModel.selectTab(AppNavTab.MORE)
+                                    viewModel.selectTab(AppNavTab.COMMS)
                                     viewModel.navigateMore(MoreSubScreen.TRANSFER, targetUser)
                                 }
                             )
                         }
 
-                        AppNavTab.SHOP -> {
+                        AppNavTab.MARKET -> {
                             ShopScreen(
                                 user = user,
                                 gameState = gameState,
@@ -224,7 +224,13 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                                 showCurseModal = showCurseModal,
                                 onDismissCurseModal = { viewModel.showCurseTargetModal.value = false },
                                 showReviveModal = showReviveModal,
-                                onDismissReviveModal = { viewModel.showReviveSectorModal.value = false }
+                                onDismissReviveModal = { viewModel.showReviveSectorModal.value = false },
+                                isWheelSpinning = isWheelSpinning,
+                                wheelRotation = wheelRotation,
+                                wheelResult = wheelResult,
+                                wheelCooldown = wheelCooldown,
+                                onSpinWheel = { viewModel.spinWheel() },
+                                onAcknowledgeWheelResult = { viewModel.acknowledgeWheelResult() }
                             )
                         }
 
@@ -241,7 +247,7 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                             )
                         }
 
-                        AppNavTab.MORE -> {
+                        AppNavTab.COMMS -> {
                             MoreHubScreen(
                                 currentSubScreen = activeMoreSubScreen,
                                 currentUser = user,
@@ -265,53 +271,62 @@ fun DeadFestApp(viewModel: DeadFestViewModel) {
                                 onSendMessage = { recipientUid, text ->
                                     viewModel.sendChatMessage(recipientUid, text)
                                 },
-                                onMarkPatchNoteRead = { viewModel.markPatchNoteRead(it) }
+                                onMarkPatchNoteRead = { viewModel.markPatchNoteRead(it) },
+                                onToggleLikeMedia = { viewModel.toggleLikeMedia(it) }
                             )
                         }
 
                         AppNavTab.SETTINGS -> {
-                            SettingsScreen(
-                                currentUser = user,
-                                allUsers = allUsers,
-                                onUpdateProfile = { name, avatar, color, themeChoice ->
-                                    viewModel.updateProfile(name, avatar, color, themeChoice)
-                                },
-                                onSwitchUser = { viewModel.switchUser(it) },
-                                onLogout = { viewModel.logout() }
-                            )
-                        }
-
-                        AppNavTab.ADMIN -> {
-                            AdminScreen(
-                                gameState = gameState,
-                                allUsers = allUsers,
-                                patchNotes = patchNotes,
-                                votePolls = votePolls,
-                                onToggleMarket = { viewModel.toggleMarket(it) },
-                                onToggleWheel = { viewModel.toggleWheel(it) },
-                                onUpdateBroadcast = { text, url, id -> viewModel.updateBroadcast(text, url, id) },
-                                onTriggerFlashSale = { viewModel.triggerFlashSale(it) },
-                                onStopFlashSale = { viewModel.stopFlashSale() },
-                                onAddSector = { viewModel.addSector(it) },
-                                onToggleLockSector = { viewModel.toggleLockSector(it) },
-                                onDeleteSector = { viewModel.deleteSector(it) },
-                                onAddShopItem = { viewModel.addShopItem(it) },
-                                onDeleteShopItem = { viewModel.deleteShopItem(it) },
-                                onAddShopTitle = { viewModel.addShopTitle(it) },
-                                onDeleteShopTitle = { viewModel.deleteShopTitle(it) },
-                                onAddShopTheme = { viewModel.addShopTheme(it) },
-                                onDeleteShopTheme = { viewModel.deleteShopTheme(it) },
-                                onCreatePatchNote = { t, c, a, v -> viewModel.createPatchNote(t, c, a, v) },
-                                onDeletePatchNote = { viewModel.deletePatchNote(it) },
-                                onCreatePoll = { t, d, o -> viewModel.createPoll(t, d, o) },
-                                onToggleClosePoll = { viewModel.toggleClosePoll(it) },
-                                onDeletePoll = { viewModel.deletePoll(it) },
-                                onAdjustCoins = { uid, delta -> viewModel.adjustPlayerCoins(uid, delta) },
-                                onToggleAdmin = { viewModel.togglePlayerAdmin(it) },
-                                onWipeUser = { viewModel.wipePlayerData(it) },
-                                onPurgeMedia = { viewModel.purgeMedia() },
-                                onResetEventData = { viewModel.resetEventData() }
-                            )
+                            if (activeMoreSubScreen == MoreSubScreen.ADMIN && user.admin) {
+                                AdminScreen(
+                                    gameState = gameState,
+                                    allUsers = allUsers,
+                                    patchNotes = patchNotes,
+                                    votePolls = votePolls,
+                                    onToggleMarket = { viewModel.toggleMarket(it) },
+                                    onToggleWheel = { viewModel.toggleWheel(it) },
+                                    onUpdateBroadcast = { text, url, id -> viewModel.updateBroadcast(text, url, id) },
+                                    onTriggerFlashSale = { viewModel.triggerFlashSale(it) },
+                                    onStopFlashSale = { viewModel.stopFlashSale() },
+                                    onUpdateEconomyMultiplier = { viewModel.updateEconomyMultiplier(it) },
+                                    onSetSectorMode = { sec, mode -> viewModel.setSectorMode(sec, mode) },
+                                    onAddSector = { viewModel.addSector(it) },
+                                    onToggleLockSector = { viewModel.toggleLockSector(it) },
+                                    onDeleteSector = { viewModel.deleteSector(it) },
+                                    onAddShopItem = { viewModel.addShopItem(it) },
+                                    onDeleteShopItem = { viewModel.deleteShopItem(it) },
+                                    onAddShopTitle = { viewModel.addShopTitle(it) },
+                                    onDeleteShopTitle = { viewModel.deleteShopTitle(it) },
+                                    onAddShopTheme = { viewModel.addShopTheme(it) },
+                                    onDeleteShopTheme = { viewModel.deleteShopTheme(it) },
+                                    onCreatePatchNote = { t, c, a, v -> viewModel.createPatchNote(t, c, a, v) },
+                                    onDeletePatchNote = { viewModel.deletePatchNote(it) },
+                                    onCreatePoll = { t, d, o -> viewModel.createPoll(t, d, o) },
+                                    onToggleClosePoll = { viewModel.toggleClosePoll(it) },
+                                    onDeletePoll = { viewModel.deletePoll(it) },
+                                    onAdjustCoins = { uid, delta -> viewModel.adjustPlayerCoins(uid, delta) },
+                                    onToggleAdmin = { viewModel.togglePlayerAdmin(it) },
+                                    onWipeUser = { viewModel.wipePlayerData(it) },
+                                    onPurgeMedia = { viewModel.purgeMedia() },
+                                    onResetEventData = { viewModel.resetEventData() },
+                                    onBack = { viewModel.navigateMore(MoreSubScreen.HUB) }
+                                )
+                            } else {
+                                SettingsScreen(
+                                    currentUser = user,
+                                    allUsers = allUsers,
+                                    performanceMode = performanceMode,
+                                    onTogglePerformanceMode = { viewModel.togglePerformanceMode(it) },
+                                    onUpdateProfile = { name, avatar, color, themeChoice ->
+                                        viewModel.updateProfile(name, avatar, color, themeChoice)
+                                    },
+                                    onSwitchUser = { viewModel.switchUser(it) },
+                                    onLogout = { viewModel.logout() },
+                                    onOpenAdmin = {
+                                        viewModel.navigateMore(MoreSubScreen.ADMIN)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

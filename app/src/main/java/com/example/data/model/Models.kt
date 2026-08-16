@@ -1,5 +1,7 @@
 package com.example.data.model
 
+import java.util.Locale
+
 data class User(
     val uid: String = "",
     val email: String = "",
@@ -17,20 +19,33 @@ data class PlayerData(
     val ownedThemes: List<String> = listOf("default"),
     val ownedTitles: List<String> = listOf("Survivor"),
     val selectedTheme: String = "default",
-    val games: Map<String, SectorDeaths> = emptyMap(),
+    val games: Map<String, SectorStats> = emptyMap(),
     val lastLoginDate: String? = null,
     val lastReadPatchNoteId: String? = null
 ) {
     val totalDeaths: Int
         get() = games.values.sumOf { it.deaths }
+
+    val totalKills: Int
+        get() = games.values.sumOf { it.kills }
+
+    val kdRatio: Double
+        get() = if (totalDeaths == 0) totalKills.toDouble() else {
+            val ratio = totalKills.toDouble() / totalDeaths.toDouble()
+            String.format(Locale.US, "%.2f", ratio).toDoubleOrNull() ?: ratio
+        }
 }
 
-data class SectorDeaths(
-    val deaths: Int = 0
+data class SectorStats(
+    val deaths: Int = 0,
+    val kills: Int = 0
 )
+
+typealias SectorDeaths = SectorStats
 
 data class GameState(
     val grandTotal: Int = 14382,
+    val economyMultiplier: Double = 1.0,
     val games: List<String> = listOf(
         "Sector 01 - Red Wastelands",
         "Sector 04 - Core Reactor",
@@ -39,6 +54,13 @@ data class GameState(
         "Sector X - Bio-Lab Vault"
     ),
     val lockedGames: List<String> = listOf("Sector X - Bio-Lab Vault"),
+    val sectorModes: Map<String, String> = mapOf(
+        "Sector 01 - Red Wastelands" to "NORMAL",
+        "Sector 04 - Core Reactor" to "SHOOTER",
+        "Sector 07 - Neo-Haven" to "NORMAL",
+        "Sector 09 - Sub-Levels" to "SHOOTER",
+        "Sector X - Bio-Lab Vault" to "SHOOTER"
+    ),
     val marketEnabled: Boolean = true,
     val wheelEnabled: Boolean = true,
     val shopItems: List<ShopItem> = listOf(
@@ -141,23 +163,25 @@ data class WheelSegment(
 data class EventLog(
     val id: String = "",
     val message: String = "",
-    val category: String = "death", // "death" | "curse_success" | "curse_blocked" | "revive" | "transfer" | "wheel"
+    val category: String = "death", // "death" | "kill" | "curse_success" | "curse_blocked" | "revive" | "transfer" | "wheel" | "admin"
     val userUid: String? = null,
     val attackerUid: String? = null,
     val targetUid: String? = null,
     val sector: String? = null,
     val amount: Int? = null,
+    val kills: Int? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
 
 data class DiscordMedia(
     val id: String = "",
-    val type: String = "Image", // "Image" | "Video"
+    val type: String = "Image", // "Image" | "Video" | "Audio" | "Clip"
     val url: String = "",
     val caption: String = "",
     val timestamp: Long = System.currentTimeMillis(),
     val authorName: String = "Command HQ",
-    val likes: Int = 12
+    val likes: Int = 12,
+    val likedBy: List<String> = emptyList()
 )
 
 data class PatchNote(

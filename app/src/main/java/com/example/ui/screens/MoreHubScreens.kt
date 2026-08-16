@@ -75,6 +75,22 @@ import com.example.ui.components.TerminalCard
 import com.example.ui.theme.TerminalTheme
 import com.example.ui.viewmodel.MoreSubScreen
 
+fun formatRelativeTime(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    if (diff < 0) return "Just now"
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+
+    return when {
+        days > 0 -> "${days}d ago"
+        hours > 0 -> "${hours}h ago"
+        minutes > 0 -> "${minutes}m ago"
+        else -> "Just now"
+    }
+}
+
 @Composable
 fun MoreHubScreen(
     currentSubScreen: MoreSubScreen,
@@ -92,6 +108,7 @@ fun MoreHubScreen(
     onCastVote: (String, String) -> Unit,
     onSendMessage: (String, String) -> Unit,
     onMarkPatchNoteRead: (String) -> Unit,
+    onToggleLikeMedia: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     when (currentSubScreen) {
@@ -104,6 +121,8 @@ fun MoreHubScreen(
         MoreSubScreen.MEDIA -> {
             MediaFeedScreen(
                 mediaList = mediaFeed,
+                currentUserId = currentUser.uid,
+                onToggleLike = onToggleLikeMedia,
                 onBack = { onNavigateSubScreen(MoreSubScreen.HUB, null) },
                 modifier = modifier
             )
@@ -161,6 +180,9 @@ fun MoreHubScreen(
                 onBack = { onNavigateSubScreen(MoreSubScreen.HUB, null) },
                 modifier = modifier
             )
+        }
+        MoreSubScreen.ADMIN -> {
+            // Handled at top-level Settings tab navigation
         }
     }
 }
@@ -278,6 +300,8 @@ fun MoreHubGrid(
 @Composable
 fun MediaFeedScreen(
     mediaList: List<DiscordMedia>,
+    currentUserId: String = "",
+    onToggleLike: (String) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -307,6 +331,7 @@ fun MediaFeedScreen(
             }
         } else {
             items(mediaList, key = { it.id }) { item ->
+                val hasLiked = item.likedBy.contains(currentUserId)
                 TerminalCard(
                     modifier = Modifier.fillMaxWidth(),
                     borderColor = theme.primaryDim,
@@ -365,10 +390,33 @@ fun MediaFeedScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(imageVector = Icons.Default.Favorite, contentDescription = "Likes", tint = theme.error, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = "${item.likes} SURVIVOR UPVOTES", style = MaterialTheme.typography.labelSmall, color = theme.textGray)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (hasLiked) theme.error.copy(alpha = 0.2f) else theme.surface2,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (hasLiked) theme.error.copy(alpha = 0.5f) else theme.surface3),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onToggleLike(item.id) }
+                                    .testTag("media_like_${item.id.take(6)}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Favorite,
+                                        contentDescription = "Likes",
+                                        tint = if (hasLiked) theme.error else theme.textGray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${item.likes} ${if (hasLiked) "LIKED" else "UPVOTES"}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (hasLiked) theme.error else theme.textGray,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                             Text(
                                 text = "RAW LINK // ENCRYPTED",

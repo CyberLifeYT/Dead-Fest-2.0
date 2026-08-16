@@ -1,11 +1,18 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,10 +31,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,11 +66,28 @@ import com.example.ui.components.TerminalButton
 import com.example.ui.components.TerminalCard
 import com.example.ui.theme.TerminalTheme
 
+data class QuickSurvivorOption(
+    val title: String,
+    val email: String,
+    val pass: String,
+    val avatar: String
+)
+
+val QUICK_SURVIVORS = listOf(
+    QuickSurvivorOption("Overlord (Admin)", "commander@deadfest.terminal", "overlord123", "☣️"),
+    QuickSurvivorOption("Neon Reaper", "reaper@wasteland.net", "reaper123", "💀"),
+    QuickSurvivorOption("Cyber Valkyrie", "valk@neo-haven.org", "valkyrie123", "⚡")
+)
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AuthScreen(
     onLogin: (String, String) -> Unit,
-    onRegister: (String, String) -> Unit,
+    onRegister: (String, String, String) -> Unit,
     onGoogleSignIn: () -> Unit,
+    onForgotPassword: (String) -> Unit,
+    isLoading: Boolean = false,
+    performanceMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val theme = TerminalTheme.current
@@ -71,8 +95,9 @@ fun AuthScreen(
 
     var email by remember { mutableStateOf("commander@deadfest.terminal") }
     var password by remember { mutableStateOf("overlord123") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var callsign by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var rememberMe by remember { mutableStateOf(true) }
     var inlineNotice by remember { mutableStateOf<String?>(null) }
     var isNoticeError by remember { mutableStateOf(false) }
 
@@ -82,50 +107,50 @@ fun AuthScreen(
             .background(theme.bgDark),
         contentAlignment = Alignment.Center
     ) {
-        CrtScanlineOverlay(alpha = 0.05f)
+        CrtScanlineOverlay(alpha = 0.04f, enabled = !performanceMode)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 32.dp),
+                .padding(horizontal = 20.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Biohazard Mark
+            // Emblem
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(68.dp)
                     .clip(CircleShape)
                     .background(theme.surface2)
                     .border(2.dp, theme.primary, CircleShape)
                     .shadow(16.dp, CircleShape, spotColor = theme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "☣️", fontSize = 36.sp)
+                Text(text = "☣️", fontSize = 32.sp)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = "DEAD-FEST TERMINAL",
                 style = MaterialTheme.typography.headlineLarge,
                 color = theme.textLight,
                 fontWeight = FontWeight.Black,
-                letterSpacing = 1.5.sp
+                letterSpacing = 1.2.sp
             )
 
             Text(
-                text = "RESTRICTED SURVIVOR NETWORK ACCESS",
+                text = "SECURE SURVIVOR NEURAL ACCESS // FIREBASE ACTIVE",
                 style = MaterialTheme.typography.labelSmall,
                 color = theme.secondary,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Main Auth Box
+            // Main Auth Card
             TerminalCard(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,7 +160,7 @@ fun AuthScreen(
                 backgroundColor = theme.surface1.copy(alpha = 0.95f)
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // Mode Tabs (LOGIN / REGISTER)
+                    // Switcher Tabs
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -179,7 +204,7 @@ fun AuthScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "REGISTER",
+                                text = "NEW SURVIVOR (SIGN UP)",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = if (isRegisterMode) theme.bgDark else theme.textGray,
                                 fontWeight = FontWeight.Black
@@ -187,7 +212,39 @@ fun AuthScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Callsign input (when registering)
+                    AnimatedVisibility(
+                        visible = isRegisterMode,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut() + slideOutVertically()
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = callsign,
+                                onValueChange = { callsign = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_input_callsign"),
+                                label = { Text("CALLSIGN / CODENAME", color = theme.textGray) },
+                                leadingIcon = {
+                                    Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = theme.primary)
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = theme.primary,
+                                    unfocusedBorderColor = theme.surface3,
+                                    focusedTextColor = theme.textLight,
+                                    unfocusedTextColor = theme.textLight,
+                                    focusedContainerColor = theme.surface2,
+                                    unfocusedContainerColor = theme.surface2
+                                ),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
 
                     // Email Field
                     OutlinedTextField(
@@ -196,7 +253,7 @@ fun AuthScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("auth_input_email"),
-                        label = { Text("SURVIVOR EMAIL / CALLSIGN", color = theme.textGray) },
+                        label = { Text("SURVIVOR EMAIL", color = theme.textGray) },
                         leadingIcon = {
                             Icon(imageVector = Icons.Default.Email, contentDescription = null, tint = theme.primary)
                         },
@@ -213,7 +270,7 @@ fun AuthScreen(
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Password Field
                     OutlinedTextField(
@@ -222,7 +279,7 @@ fun AuthScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("auth_input_password"),
-                        label = { Text("ENCLAVE PASSPHRASE", color = theme.textGray) },
+                        label = { Text("SECURITY PASSPHRASE (MIN 6 CHARS)", color = theme.textGray) },
                         leadingIcon = {
                             Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = theme.primary)
                         },
@@ -245,57 +302,77 @@ fun AuthScreen(
                             unfocusedContainerColor = theme.surface2
                         ),
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = if (isRegisterMode) ImeAction.Next else ImeAction.Done),
                         keyboardActions = KeyboardActions(onDone = {
-                            if (isRegisterMode) onRegister(email, password) else onLogin(email, password)
+                            if (!isRegisterMode) onLogin(email, password)
                         }),
                         shape = RoundedCornerShape(12.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Options Row: Remember Me & Forgot Password
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    // Confirm Password (when registering)
+                    AnimatedVisibility(
+                        visible = isRegisterMode,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut() + slideOutVertically()
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { rememberMe = !rememberMe }
-                        ) {
-                            Checkbox(
-                                checked = rememberMe,
-                                onCheckedChange = { rememberMe = it },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = theme.primary,
-                                    uncheckedColor = theme.textGray,
-                                    checkmarkColor = theme.bgDark
-                                )
-                            )
-                            Text(
-                                text = "REMEMBER ME",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = theme.textLight,
-                                fontWeight = FontWeight.Bold
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = confirmPassword,
+                                onValueChange = { confirmPassword = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("auth_input_confirm_password"),
+                                label = { Text("CONFIRM PASSPHRASE", color = theme.textGray) },
+                                leadingIcon = {
+                                    Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = theme.primary)
+                                },
+                                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = if (confirmPassword.isNotEmpty() && confirmPassword != password) theme.error else theme.primary,
+                                    unfocusedBorderColor = theme.surface3,
+                                    focusedTextColor = theme.textLight,
+                                    unfocusedTextColor = theme.textLight,
+                                    focusedContainerColor = theme.surface2,
+                                    unfocusedContainerColor = theme.surface2
+                                ),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp)
                             )
                         }
+                    }
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Forgot Password / Reset action
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
                         Text(
-                            text = "RESET KEY",
+                            text = "LOST PASSPHRASE? [SEND RESET KEY]",
                             style = MaterialTheme.typography.labelSmall,
                             color = theme.secondary,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable {
-                                inlineNotice = "RESET PROTOCOL: Password reset link transmitted to $email."
-                                isNoticeError = false
-                            }
+                            modifier = Modifier
+                                .clickable {
+                                    if (email.isBlank() || !email.contains("@")) {
+                                        inlineNotice = "Please enter your email above to receive a reset key."
+                                        isNoticeError = true
+                                    } else {
+                                        onForgotPassword(email)
+                                        inlineNotice = "RESET PROTOCOL: Password reset link dispatched to $email."
+                                        isNoticeError = false
+                                    }
+                                }
+                                .padding(vertical = 4.dp)
+                                .testTag("auth_reset_link")
                         )
                     }
 
                     // Inline notice banner
                     if (inlineNotice != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -313,29 +390,40 @@ fun AuthScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Submit Button
+                    // Submit Action
                     TerminalButton(
-                        text = if (isRegisterMode) "INITIALIZE ACCESS" else "AUTHORIZE ACCESS",
+                        text = if (isLoading) "AUTHENTICATING..." else if (isRegisterMode) "CREATE SURVIVOR ACCOUNT" else "INITIALIZE TERMINAL UPLINK",
                         onClick = {
                             if (email.isBlank() || password.isBlank()) {
-                                inlineNotice = "AUTHENTICATION ERROR: Callsign and passphrase required."
+                                inlineNotice = "AUTHENTICATION ERROR: Email and password required."
+                                isNoticeError = true
+                            } else if (password.length < 6) {
+                                inlineNotice = "AUTHENTICATION ERROR: Passphrase must be at least 6 characters."
+                                isNoticeError = true
+                            } else if (isRegisterMode && confirmPassword.isNotEmpty() && password != confirmPassword) {
+                                inlineNotice = "AUTHENTICATION ERROR: Passwords do not match."
                                 isNoticeError = true
                             } else {
-                                if (isRegisterMode) onRegister(email, password) else onLogin(email, password)
+                                inlineNotice = null
+                                if (isRegisterMode) {
+                                    onRegister(email, password, callsign.ifBlank { email.substringBefore("@") })
+                                } else {
+                                    onLogin(email, password)
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        icon = if (isRegisterMode) "⚡" else "🔓",
+                        icon = if (isLoading) "⏳" else if (isRegisterMode) "⚡" else "🔓",
                         testTag = "auth_submit_btn"
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Satellite Uplink (Google)
+                    // Google Satellite Sign In
                     TerminalButton(
-                        text = "SATELLITE UPLINK (GOOGLE)",
+                        text = "SATELLITE UPLINK (GOOGLE / CREDENTIAL MESH)",
                         onClick = onGoogleSignIn,
                         modifier = Modifier.fillMaxWidth(),
                         isPrimary = false,
@@ -345,7 +433,59 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Quick Demo Survivor Selector Chips (1-tap fill for fast testing)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 460.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "FAST-FILL SURVIVOR CREDENTIALS (1-TAP TEST):",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = theme.textGray,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    QUICK_SURVIVORS.forEach { opt ->
+                        Surface(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(theme.surface2)
+                                .border(1.dp, theme.surface3, RoundedCornerShape(12.dp))
+                                .clickable {
+                                    email = opt.email
+                                    password = opt.pass
+                                    isRegisterMode = false
+                                    inlineNotice = "Selected ${opt.title} profile"
+                                    isNoticeError = false
+                                }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .testTag("quick_fill_${opt.email.take(6)}"),
+                            color = Color.Transparent
+                        ) {
+                            Text(
+                                text = "${opt.avatar} ${opt.title}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = theme.textLight,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "DEAD-FEST ENCRYPTION MESH // NO UNAUTHORIZED SURVIVORS",

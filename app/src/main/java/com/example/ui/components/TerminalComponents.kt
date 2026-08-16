@@ -50,7 +50,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,37 +61,24 @@ import com.example.ui.viewmodel.AppNavTab
 
 @Composable
 fun CrtScanlineOverlay(
-    modifier: Modifier = Modifier,
-    alpha: Float = 0.05f
+    alpha: Float = 0.03f,
+    enabled: Boolean = true
 ) {
-    Canvas(
-        modifier = modifier.fillMaxSize()
-    ) {
-        // Horizontal CRT scanlines
-        val strokeWidth = 1.5f
-        val spacing = 4f
-        var y = 0f
-        while (y < size.height) {
+    if (!enabled || alpha <= 0f) return
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val scanlineSpacing = 6.dp.toPx()
+        val numLines = (size.height / scanlineSpacing).toInt()
+        val lineColor = Color.White.copy(alpha = alpha)
+
+        for (i in 0..numLines) {
+            val y = i * scanlineSpacing
             drawLine(
-                color = Color.Black.copy(alpha = alpha * 1.6f),
+                color = lineColor,
                 start = Offset(0f, y),
                 end = Offset(size.width, y),
-                strokeWidth = strokeWidth
-            )
-            y += spacing
-        }
-
-        // Vertical data grid mesh lines
-        val vSpacing = 8f
-        var x = 0f
-        while (x < size.width) {
-            drawLine(
-                color = Color(0xFFFF3B30).copy(alpha = alpha * 0.12f),
-                start = Offset(x, 0f),
-                end = Offset(x, size.height),
                 strokeWidth = 1f
             )
-            x += vSpacing
         }
     }
 }
@@ -101,10 +87,10 @@ fun CrtScanlineOverlay(
 fun TerminalHeader(
     eyebrow: String,
     title: String,
-    isRefreshing: Boolean,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier,
-    trailingContent: (@Composable () -> Unit)? = null
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
+    trailingContent: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier
 ) {
     val theme = TerminalTheme.current
     val infiniteTransition = rememberInfiniteTransition(label = "refresh_spin")
@@ -121,23 +107,23 @@ fun TerminalHeader(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp), spotColor = theme.primary),
+            .shadow(8.dp, RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp), spotColor = theme.primary),
         color = theme.bgDark.copy(alpha = 0.98f),
-        shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .border(
                     width = 1.dp,
-                    color = theme.primary.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                    color = theme.primary.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
                 )
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -150,18 +136,18 @@ fun TerminalHeader(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "STATUS: ${eyebrow.uppercase()}",
+                            text = eyebrow.uppercase(),
                             style = MaterialTheme.typography.labelSmall,
                             color = theme.primary,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp,
+                            letterSpacing = 1.sp,
                             fontSize = 10.sp
                         )
                     }
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = title.uppercase(),
-                        style = MaterialTheme.typography.headlineLarge,
+                        style = MaterialTheme.typography.titleLarge,
                         color = theme.textLight,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 0.5.sp,
@@ -176,16 +162,16 @@ fun TerminalHeader(
                 ) {
                     trailingContent?.invoke()
 
-                    // Beacon Indicator
+                    // Online live indicator
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(8.dp))
                             .background(theme.surface2)
-                            .border(1.dp, theme.primary.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .border(1.dp, theme.primary.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "UPLINK // 🟢",
+                            text = "LIVE 🟢",
                             style = MaterialTheme.typography.labelSmall,
                             color = theme.primary,
                             fontWeight = FontWeight.Bold,
@@ -197,10 +183,10 @@ fun TerminalHeader(
                     IconButton(
                         onClick = onRefresh,
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(theme.surface2)
-                            .border(1.dp, theme.surface3, RoundedCornerShape(14.dp))
+                            .border(1.dp, theme.surface3, RoundedCornerShape(10.dp))
                             .testTag("terminal_refresh_btn"),
                         colors = IconButtonDefaults.iconButtonColors(
                             contentColor = theme.textLight
@@ -208,8 +194,9 @@ fun TerminalHeader(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh Terminal",
-                            modifier = if (isRefreshing) Modifier.rotate(rotation) else Modifier
+                            contentDescription = "Refresh",
+                            modifier = if (isRefreshing) Modifier.rotate(rotation) else Modifier,
+                            tint = theme.textLight
                         )
                     }
                 }
@@ -221,20 +208,20 @@ fun TerminalHeader(
 @Composable
 fun TerminalCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
+    shape: Shape = RoundedCornerShape(16.dp),
     borderColor: Color? = null,
     backgroundColor: Color? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
     val theme = TerminalTheme.current
-    val effectiveBg = backgroundColor ?: theme.surface1
-    val effectiveBorder = borderColor ?: theme.surface3
+    val strokeColor = borderColor ?: theme.surface3
+    val containerColor = backgroundColor ?: theme.surface1
 
     val baseModifier = modifier
         .clip(shape)
-        .background(effectiveBg)
-        .border(1.dp, effectiveBorder, shape)
+        .background(containerColor)
+        .border(1.dp, strokeColor, shape)
 
     val clickableModifier = if (onClick != null) {
         baseModifier.clickable(
@@ -246,7 +233,7 @@ fun TerminalCard(
         baseModifier
     }
 
-    Box(modifier = clickableModifier.padding(18.dp)) {
+    Box(modifier = clickableModifier.padding(14.dp)) {
         content()
     }
 }
@@ -268,49 +255,16 @@ fun TerminalButton(
             onClick = onClick,
             enabled = enabled,
             modifier = modifier
-                .heightIn(min = 56.dp)
+                .heightIn(min = 50.dp)
                 .testTag(testTag)
-                .shadow(if (enabled) 12.dp else 0.dp, RoundedCornerShape(24.dp), spotColor = theme.primary),
+                .shadow(if (enabled) 8.dp else 0.dp, RoundedCornerShape(16.dp), spotColor = theme.primary),
             colors = ButtonDefaults.buttonColors(
                 containerColor = theme.primary,
                 contentColor = Color.Black,
                 disabledContainerColor = theme.surface3,
                 disabledContentColor = theme.textGray
             ),
-            shape = RoundedCornerShape(24.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                if (icon != null) {
-                    Text(text = icon, fontSize = 20.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(
-                    text = text.uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.5.sp,
-                    color = Color.Black
-                )
-            }
-        }
-    } else {
-        OutlinedButton(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier
-                .heightIn(min = 54.dp)
-                .testTag(testTag),
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = theme.surface2,
-                contentColor = theme.textLight
-            ),
-            border = ButtonDefaults.outlinedButtonBorder(enabled = enabled).copy(
-                brush = Brush.horizontalGradient(listOf(theme.surface3, theme.surface3))
-            ),
-            shape = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -322,9 +276,42 @@ fun TerminalButton(
                 }
                 Text(
                     text = text.uppercase(),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp,
+                    color = Color.Black
+                )
+            }
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier
+                .heightIn(min = 48.dp)
+                .testTag(testTag),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = theme.surface2,
+                contentColor = theme.textLight
+            ),
+            border = ButtonDefaults.outlinedButtonBorder(enabled = enabled).copy(
+                brush = Brush.horizontalGradient(listOf(theme.surface3, theme.surface3))
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (icon != null) {
+                    Text(text = icon, fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = text.uppercase(),
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp,
+                    letterSpacing = 0.5.sp,
                     color = theme.textLight
                 )
             }
@@ -347,7 +334,7 @@ fun TerminalBadge(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(bg)
-            .border(1.dp, fg.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+            .border(1.dp, fg.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp)
     ) {
         Text(
@@ -355,7 +342,8 @@ fun TerminalBadge(
             style = MaterialTheme.typography.labelSmall,
             color = fg,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp
+            letterSpacing = 0.5.sp,
+            fontSize = 9.sp
         )
     }
 }
@@ -364,7 +352,7 @@ fun TerminalBadge(
 fun SurvivorAvatar(
     avatar: String,
     colorHex: String,
-    size: Dp = 48.dp,
+    size: Dp = 44.dp,
     hasShield: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -384,7 +372,7 @@ fun SurvivorAvatar(
     ) {
         Text(
             text = avatar,
-            fontSize = (size.value * 0.52f).sp,
+            fontSize = (size.value * 0.5f).sp,
             textAlign = TextAlign.Center
         )
 
@@ -415,59 +403,58 @@ fun TerminalBottomNav(
     modifier: Modifier = Modifier
 ) {
     val theme = TerminalTheme.current
-    val tabs = if (isAdmin) AppNavTab.entries else AppNavTab.entries.filter { it != AppNavTab.ADMIN }
+    val tabs = AppNavTab.entries
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(16.dp, RoundedCornerShape(28.dp), spotColor = theme.primary),
-        color = theme.surface1.copy(alpha = 0.95f),
-        shape = RoundedCornerShape(28.dp)
+            .shadow(12.dp, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp), spotColor = theme.primary),
+        color = theme.surface1.copy(alpha = 0.98f),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, theme.surface3, RoundedCornerShape(28.dp))
-                .padding(vertical = 8.dp, horizontal = 6.dp),
+                .border(1.dp, theme.surface3, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .padding(vertical = 6.dp, horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEach { tab ->
                 val isSelected = tab == activeTab
-                val itemBg = if (isSelected) theme.primary.copy(alpha = 0.12f) else Color.Transparent
-                val itemBorder = if (isSelected) theme.primary.copy(alpha = 0.35f) else Color.Transparent
-                val textColor = if (isSelected) theme.primary else theme.textGray.copy(alpha = 0.7f)
+                val itemBg = if (isSelected) theme.primary.copy(alpha = 0.15f) else Color.Transparent
+                val itemBorder = if (isSelected) theme.primary.copy(alpha = 0.4f) else Color.Transparent
+                val textColor = if (isSelected) theme.primary else theme.textGray
 
                 Column(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(itemBg)
-                        .border(1.dp, itemBorder, RoundedCornerShape(18.dp))
+                        .border(1.dp, itemBorder, RoundedCornerShape(12.dp))
                         .clickable { onTabSelected(tab) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
                         .testTag("nav_tab_${tab.name.lowercase()}"),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = tab.icon,
-                        fontSize = if (isSelected) 20.sp else 18.sp
+                        fontSize = if (isSelected) 18.sp else 16.sp
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = when (tab) {
-                            AppNavTab.DASHBOARD -> "DASHBOARD"
-                            AppNavTab.PLAYERS -> "ROSTER"
-                            AppNavTab.SHOP -> "MARKET"
+                            AppNavTab.DASHBOARD -> "OVERVIEW"
+                            AppNavTab.PLAYERS -> "SURVIVORS"
+                            AppNavTab.MARKET -> "MARKET"
                             AppNavTab.WHEEL -> "WHEEL"
-                            AppNavTab.MORE -> "MORE"
-                            AppNavTab.SETTINGS -> "CONFIG"
-                            AppNavTab.ADMIN -> "OVERSEER"
+                            AppNavTab.COMMS -> "INTEL"
+                            AppNavTab.SETTINGS -> "SYSTEM"
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = textColor,
                         fontSize = 9.sp,
                         fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
-                        letterSpacing = 0.5.sp
+                        letterSpacing = 0.4.sp
                     )
                 }
             }
@@ -499,28 +486,29 @@ fun EmergencyBroadcastBanner(
                 imageVector = Icons.Default.Warning,
                 contentDescription = "Alert",
                 tint = theme.error,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "☣️ EMERGENCY SYSTEM BROADCAST",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "EMERGENCY SYSTEM BROADCAST",
+                    style = MaterialTheme.typography.labelSmall,
                     color = theme.error,
                     fontWeight = FontWeight.Black
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = text,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = theme.textLight
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "[ DISMISS TRANSMISSION ]",
+                    text = "[ DISMISS ]",
                     style = MaterialTheme.typography.labelSmall,
                     color = theme.secondary,
                     fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
                     modifier = Modifier.clickable { onDismiss() }
                 )
             }
